@@ -1,0 +1,511 @@
+SET SERVEROUTPUT ON;
+
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE staff_t1 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE staff_t1 (
+  staff_id  NUMBER PRIMARY KEY,
+  full_name VARCHAR2(40) NOT NULL,
+  phone_raw VARCHAR2(30)
+);
+
+INSERT INTO staff_t1 VALUES (1,'Ana K','+995 599-11-22-33');
+INSERT INTO staff_t1 VALUES (2,'Gio M','(995)599112233');
+INSERT INTO staff_t1 VALUES (3,'Nino T','995-599-44-55-66');
+INSERT INTO staff_t1 VALUES (4,'Dato R',NULL);
+COMMIT;
+-- pirveli savarjisho 1) STAFF_T1 ცხრილში დაამატე 2 სვეტი: phone_clean და country_code
+
+Alter table staff_t1 
+Add(
+    phone_clean VARCHAR2(30),
+    country_code VARCHAR2(10)
+)
+
+-- SHEMDEGI SAVARJISHO  phone_clean: phone_raw-დან დატოვე მხოლოდ ციფრები (ამოაგდე +, სივრცე, ტირე, ფრჩხილები და ა.შ.)
+
+UPDATE staff_t1
+SET phone_clean  = REGEXP_REPLACE(phone_raw, '\D', ''),
+    country_code = SUBSTR(REGEXP_REPLACE(phone_raw, '\D', ''), 1, 3);
+
+COMMIT;
+
+-- TRAINING 2 — UNIQUE წესი (UNIQUE constraint / UNIQUE index)
+
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE documents_t2 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE documents_t2 (
+  doc_no     VARCHAR2(20) NOT NULL,
+  doc_type   VARCHAR2(10) NOT NULL,
+  issue_year NUMBER(4) NOT NULL,
+  owner_name VARCHAR2(50) NOT NULL
+);
+
+INSERT INTO documents_t2 VALUES ('A-100','ID',2025,'Ana K');
+INSERT INTO documents_t2 VALUES ('A-100','ID',2025,'Ana K'); -- duplicate
+INSERT INTO documents_t2 VALUES ('B-200','PASS',2024,'Gio M');
+INSERT INTO documents_t2 VALUES ('C-300','ID',2025,'Nino T');
+COMMIT;
+
+-- 1) უზრუნველყავი (doc_no, doc_type, issue_year) უნიკალურობა 
+
+-- ამოხსნა (დუბლიკატის წმენდა + UNIQUE CONSTRAINT):
+-- 1) ახალი ცხრილი დუბლიკატების გარეშე
+CREATE TABLE documents_t2_clean AS
+SELECT DISTINCT doc_no, doc_type, issue_year, owner_name
+FROM documents_t2;
+
+-- 2) ძველის წაშლა და სუფთა ცხრილის გადარქმევა
+DROP TABLE documents_t2 PURGE;
+
+ALTER TABLE documents_t2_clean RENAME TO documents_t2;
+
+-- 3) ახლა უკვე უნიკალურობის შეზღუდვა
+ALTER TABLE documents_t2
+ADD CONSTRAINT documents_t2_uq UNIQUE (doc_no, doc_type, issue_year);
+
+COMMIT;
+
+
+--------------------------------------------------------------------------------
+-- TRAINING 3 — GROUP BY + HAVING (აგრეგაცია)
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE orders_t3 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE orders_t3 (
+  order_id NUMBER PRIMARY KEY,
+  shop_id  NUMBER(4) NOT NULL,
+  amount   NUMBER(10,2) NOT NULL
+);
+
+INSERT INTO orders_t3 VALUES (1,10,  50);
+INSERT INTO orders_t3 VALUES (2,10,  70);
+INSERT INTO orders_t3 VALUES (3,10,  30);
+INSERT INTO orders_t3 VALUES (4,10,  90);
+
+INSERT INTO orders_t3 VALUES (5,20, 120);
+INSERT INTO orders_t3 VALUES (6,20,  80);
+INSERT INTO orders_t3 VALUES (7,20,  60);
+
+INSERT INTO orders_t3 VALUES (8,30,  40);
+INSERT INTO orders_t3 VALUES (9,30,  55);
+INSERT INTO orders_t3 VALUES (10,30, 65);
+INSERT INTO orders_t3 VALUES (11,30, 75);
+INSERT INTO orders_t3 VALUES (12,30, 85);
+COMMIT;
+
+-- ამოცანა:
+-- SHOP_ID-ის მიხედვით გამოიტანე:
+-- count(*), sum(amount), avg(amount)
+-- აჩვენე მხოლოდ shop-ები სადაც count >= 4
+-- დაალაგე sum(amount) DESC
+
+SELECT
+  shop_id,
+  COUNT(*) AS orders_cnt,
+  SUM(amount) AS total_amount,
+  ROUND(AVG(amount), 2) AS avg_amount
+FROM orders_t3
+GROUP BY shop_id
+HAVING COUNT(*) >= 4
+ORDER BY SUM(amount) DESC;
+
+-- TRAINING 4 — Correlated Subquery: TOP amount თითო shop-ში
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE orders_t4 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE orders_t4 (
+  order_id NUMBER PRIMARY KEY,
+  shop_id  NUMBER(4) NOT NULL,
+  amount   NUMBER(10,2) NOT NULL
+);
+
+INSERT INTO orders_t4 VALUES (1,10,200);
+INSERT INTO orders_t4 VALUES (2,10,350);
+INSERT INTO orders_t4 VALUES (3,10,350); -- tie
+
+INSERT INTO orders_t4 VALUES (4,20,180);
+INSERT INTO orders_t4 VALUES (5,20,260);
+
+INSERT INTO orders_t4 VALUES (6,30,120);
+INSERT INTO orders_t4 VALUES (7,30,140);
+COMMIT;
+
+
+-- ამოცანა:
+-- თითო shop_id-ზე იპოვე მაქსიმალური amount-ის მქონე order(ები)
+-- correlated subquery-ით, tie-ებიც უნდა გამოჩნდეს
+
+-- ამოხსნა:
+SELECT o.shop_id, o.order_id, o.amount
+FROM orders_t4 o
+WHERE o.amount = (
+  SELECT MAX(i.amount)
+  FROM orders_t4 i
+  WHERE i.shop_id = o.shop_id
+)
+ORDER BY o.shop_id, o.order_id;
+
+
+--------------------------------------------------------------------------------
+-- TRAINING 5 — Self Join: მომხმარებელი და მისი შემქმნელი
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE app_users_t5 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE app_users_t5 (
+  user_id    NUMBER PRIMARY KEY,
+  user_name  VARCHAR2(30) NOT NULL,
+  created_by NUMBER,
+  balance    NUMBER(10,2) NOT NULL
+);
+
+INSERT INTO app_users_t5 VALUES (1,'ADMIN1',NULL, 0);
+INSERT INTO app_users_t5 VALUES (2,'ADMIN2',NULL, 0);
+
+INSERT INTO app_users_t5 VALUES (11,'U1',1,100);
+INSERT INTO app_users_t5 VALUES (12,'U2',1,150);
+INSERT INTO app_users_t5 VALUES (21,'U3',2,120);
+INSERT INTO app_users_t5 VALUES (31,'U4',NULL,80);
+COMMIT;
+
+-- ამოცანა:
+-- self join-ით გამოიტანე user_name, creator_name, creator_balance
+-- მხოლოდ created_by IS NOT NULL
+
+-- ამოხსნა:
+SELECT
+  u.user_name  AS user_name,
+  c.user_name  AS creator_name,
+  c.balance    AS creator_balance
+FROM app_users_t5 u
+JOIN app_users_t5 c ON c.user_id = u.created_by
+WHERE u.created_by IS NOT NULL
+ORDER BY u.user_id;
+
+--------------------------------------------------------------------------------
+-- TRAINING 6 — Non-Equi Join: amount grade + amount_above_min
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE orders_t6 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE amount_grade_t6 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE orders_t6 (
+  order_id NUMBER PRIMARY KEY,
+  amount   NUMBER(10,2) NOT NULL
+);
+
+CREATE TABLE amount_grade_t6 (
+  grade NUMBER(1) PRIMARY KEY,
+  min_amount NUMBER(10,2) NOT NULL,
+  max_amount NUMBER(10,2) NOT NULL
+);
+
+INSERT INTO amount_grade_t6 VALUES (1,   0,  99.99);
+INSERT INTO amount_grade_t6 VALUES (2, 100, 199.99);
+INSERT INTO amount_grade_t6 VALUES (3, 200, 299.99);
+INSERT INTO amount_grade_t6 VALUES (4, 300, 399.99);
+INSERT INTO amount_grade_t6 VALUES (5, 400, 99999);
+
+INSERT INTO orders_t6 VALUES (1,  55);
+INSERT INTO orders_t6 VALUES (2, 150);
+INSERT INTO orders_t6 VALUES (3, 240);
+INSERT INTO orders_t6 VALUES (4, 310);
+INSERT INTO orders_t6 VALUES (5, 470);
+COMMIT;
+
+-- ამოცანა:
+-- non-equi join: amount BETWEEN min_amount AND max_amount
+-- გამოიტანე order_id, amount, grade, amount_above_min
+-- დატოვე მხოლოდ grade 3,4,5
+-- order by grade ASC, amount DESC
+
+-- ამოხსნა:
+SELECT
+  o.order_id,
+  o.amount,
+  g.grade,
+  (o.amount - g.min_amount) AS amount_above_min
+FROM orders_t6 o
+JOIN amount_grade_t6 g
+  ON o.amount BETWEEN g.min_amount AND g.max_amount
+WHERE g.grade IN (3,4,5)
+ORDER BY g.grade ASC, o.amount DESC;
+
+--------------------------------------------------------------------------------
+-- TRAINING 7 — NOT EXISTS: კატეგორიები პროდუქტის გარეშე
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE products_t7 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE categories_t7 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE categories_t7 (
+  cat_id NUMBER PRIMARY KEY,
+  cat_name VARCHAR2(30) NOT NULL
+);
+
+CREATE TABLE products_t7 (
+  prod_id NUMBER PRIMARY KEY,
+  prod_name VARCHAR2(30) NOT NULL,
+  cat_id NUMBER REFERENCES categories_t7(cat_id)
+);
+
+INSERT INTO categories_t7 VALUES (1,'Phones');
+INSERT INTO categories_t7 VALUES (2,'Laptops');
+INSERT INTO categories_t7 VALUES (3,'Accessories');
+INSERT INTO categories_t7 VALUES (4,'Cameras');
+
+INSERT INTO products_t7 VALUES (10,'iPhone',1);
+INSERT INTO products_t7 VALUES (11,'ThinkPad',2);
+INSERT INTO products_t7 VALUES (12,'Mouse',3);
+COMMIT;
+
+-- ამოცანა:
+-- გამოიტანე კატეგორიები სადაც არც ერთი პროდუქტი არ არის (NOT EXISTS)
+
+-- ამოხსნა:
+SELECT c.cat_id, c.cat_name
+FROM categories_t7 c
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM products_t7 p
+  WHERE p.cat_id = c.cat_id
+)
+ORDER BY c.cat_id;
+
+
+--------------------------------------------------------------------------------
+-- TRAINING 8 — პირობითი INSERT + UPDATE (MERGE-ის გარეშე)
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE categories_t8 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE categories_t8 (
+  cat_id NUMBER PRIMARY KEY,
+  cat_name VARCHAR2(30) NOT NULL,
+  status VARCHAR2(10)
+);
+
+INSERT INTO categories_t8 VALUES (1,'PHONES','ACTIVE');
+INSERT INTO categories_t8 VALUES (2,'LAPTOPS','ACTIVE');
+COMMIT;
+
+-- ამოცანა:
+-- უზრუნველყავი რომ cat_name='SECURITY' არსებობდეს status='ACTIVE'-ით
+-- თუ არ არსებობს -> insert (99,'SECURITY','ACTIVE') INSERT...SELECT...WHERE NOT EXISTS
+-- თუ არსებობს -> update status='ACTIVE' UPDATE...WHERE EXISTS
+-- MERGE არ გამოიყენო; ერთ სკრიპტში
+
+-- ამოხსნა:
+INSERT INTO categories_t8 (cat_id, cat_name, status)
+SELECT 99, 'SECURITY', 'ACTIVE'
+FROM dual
+WHERE NOT EXISTS (
+  SELECT 1 FROM categories_t8 WHERE cat_name = 'SECURITY'
+);
+
+UPDATE categories_t8
+SET status = 'ACTIVE'
+WHERE EXISTS (
+  SELECT 1 FROM categories_t8 WHERE cat_name = 'SECURITY'
+)
+AND cat_name = 'SECURITY';
+
+COMMIT;
+
+
+
+--------------------------------------------------------------------------------
+-- TRAINING 9 — User + Role + GRANT (read-only)
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE products_t9 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE categories_t9 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE categories_t9 (
+  cat_id NUMBER PRIMARY KEY,
+  cat_name VARCHAR2(30) NOT NULL
+);
+
+CREATE TABLE products_t9 (
+  prod_id NUMBER PRIMARY KEY,
+  prod_name VARCHAR2(30) NOT NULL,
+  cat_id NUMBER REFERENCES categories_t9(cat_id)
+);
+
+INSERT INTO categories_t9 VALUES (1,'Phones');
+INSERT INTO products_t9 VALUES (10,'iPhone',1);
+COMMIT;
+
+-- ამოცანა:
+-- შექმენი user trainee_reader (პაროლი Read#2025), მიეცი login
+-- შექმენი role trainee_read_role
+-- role-ს მიეცი მხოლოდ SELECT უფლებები PRODUCTS_T9 და CATEGORIES_T9-ზე
+-- role მიანიჭე user-ს
+-- user-ს არ უნდა ჰქონდეს DDL უფლებები
+
+-- ამოხსნა:
+-- შენიშვნა: CREATE USER/GRANT CREATE SESSION სჭირდება DBA უფლებებს (გაუშვი SYS ან DBA მომხმარებლით).
+
+-- (A) Role:
+BEGIN
+  EXECUTE IMMEDIATE 'DROP ROLE trainee_read_role';
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+CREATE ROLE trainee_read_role;
+
+-- (B) User:
+BEGIN
+  EXECUTE IMMEDIATE 'DROP USER trainee_reader CASCADE';
+EXCEPTION WHEN OTHERS THEN NULL;
+END;
+/
+CREATE USER trainee_reader IDENTIFIED BY "Read#2025";
+
+GRANT CREATE SESSION TO trainee_reader;
+
+-- (C) Object grants via role:
+GRANT SELECT ON categories_t9 TO trainee_read_role;
+GRANT SELECT ON products_t9   TO trainee_read_role;
+
+GRANT trainee_read_role TO trainee_reader;
+
+-- (D) შემოწმების იდეა (დახმარება):
+-- 1) trainee_reader-ით login -> SELECT შეუძლია:
+--    SELECT * FROM categories_t9;
+--    SELECT * FROM products_t9;
+-- 2) trainee_reader-ით ეს უნდა ჩავარდეს:
+--    CREATE TABLE x(a NUMBER);
+--    INSERT INTO categories_t9 VALUES (2,'Laptops');
+
+--------------------------------------------------------------------------------
+-- TRAINING 10 — ნორმალიზაცია 4NF-მდე (SALES_RAW_T10)
+--------------------------------------------------------------------------------
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE sales_t10 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE product_suppliers_t10 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE suppliers_t10 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE products_t10 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE customers_t10 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP TABLE sales_raw_t10 PURGE'; EXCEPTION WHEN OTHERS THEN NULL; END;
+BEGIN EXECUTE IMMEDIATE 'DROP SEQUENCE seq_supplier_t10'; EXCEPTION WHEN OTHERS THEN NULL; END;
+/
+
+CREATE TABLE sales_raw_t10 (
+  customer_id    NUMBER(6) NOT NULL,
+  customer_name  VARCHAR2(50) NOT NULL,
+  product_code   VARCHAR2(10) NOT NULL,
+  product_name   VARCHAR2(80) NOT NULL,
+  supplier_name  VARCHAR2(50) NOT NULL,
+  supplier_phone VARCHAR2(20) NOT NULL,
+  sale_month     VARCHAR2(10) NOT NULL
+);
+
+INSERT INTO sales_raw_t10 VALUES (1,'Ana K.','P10','Laptop','TechSupply','555-777','2025-10');
+INSERT INTO sales_raw_t10 VALUES (1,'Ana K.','P20','Mouse','TechSupply','555-777','2025-10');
+INSERT INTO sales_raw_t10 VALUES (2,'Gio M.','P10','Laptop','TechSupply','555-777','2025-10');
+INSERT INTO sales_raw_t10 VALUES (3,'Nino T.','P30','Camera','FotoLab','555-888','2025-10');
+INSERT INTO sales_raw_t10 VALUES (3,'Nino T.','P10','Laptop','TechSupply','555-777','2025-10');
+COMMIT;
+
+-- ამოცანა:
+-- 1) დაადგინე ნორმალური ფორმა და ჩამოწერე FD-ები (კომენტარში)
+-- 2) გააკეთე decomposition 4NF-მდე
+-- 3) შექმენი PK/FK-ები და ჩატვირთე მონაცემები raw-დან
+
+-- ამოხსნა (FD-ები/ლოგიკა კომენტარში):
+-- FD მაგალითები:
+-- customer_id  -> customer_name
+-- product_code -> product_name
+-- supplier_name -> supplier_phone
+-- (raw ცხრილში განმეორებებია, ამიტომ 3NF/BCNF დარღვეულია ტრანზიტიული დამოკიდებულებებით)
+
+-- 4NF-მდე გაყოფა:
+-- customers_t10(customer_id PK, customer_name)
+-- products_t10(product_code PK, product_name)
+-- suppliers_t10(supplier_id PK, supplier_name UNIQUE, supplier_phone)
+-- sales_t10(customer_id FK, product_code FK, supplier_id FK, sale_month, PK(customer_id, product_code, supplier_id, sale_month))
+-- (თუ product-ს მრავალ supplier-თან ურთიერთობა გინდა ცალკე, დამატებით არის product_suppliers_t10)
+
+CREATE TABLE customers_t10 (
+  customer_id   NUMBER(6) PRIMARY KEY,
+  customer_name VARCHAR2(50) NOT NULL
+);
+
+CREATE TABLE products_t10 (
+  product_code VARCHAR2(10) PRIMARY KEY,
+  product_name VARCHAR2(80) NOT NULL
+);
+
+CREATE TABLE suppliers_t10 (
+  supplier_id   NUMBER PRIMARY KEY,
+  supplier_name VARCHAR2(50) NOT NULL UNIQUE,
+  supplier_phone VARCHAR2(20) NOT NULL
+);
+
+CREATE SEQUENCE seq_supplier_t10 START WITH 1;
+
+CREATE TABLE sales_t10 (
+  customer_id  NUMBER(6) NOT NULL,
+  product_code VARCHAR2(10) NOT NULL,
+  supplier_id  NUMBER NOT NULL,
+  sale_month   VARCHAR2(10) NOT NULL,
+  CONSTRAINT sales_t10_pk PRIMARY KEY (customer_id, product_code, supplier_id, sale_month),
+  CONSTRAINT sales_t10_cust_fk FOREIGN KEY (customer_id) REFERENCES customers_t10(customer_id),
+  CONSTRAINT sales_t10_prod_fk FOREIGN KEY (product_code) REFERENCES products_t10(product_code),
+  CONSTRAINT sales_t10_supp_fk FOREIGN KEY (supplier_id) REFERENCES suppliers_t10(supplier_id)
+);
+
+-- სურვილისამებრ: Product-Supplier mapping (ბევრი-მრავალზე)
+CREATE TABLE product_suppliers_t10 (
+  product_code VARCHAR2(10) NOT NULL,
+  supplier_id  NUMBER NOT NULL,
+  CONSTRAINT product_suppliers_t10_pk PRIMARY KEY (product_code, supplier_id),
+  CONSTRAINT ps_t10_prod_fk FOREIGN KEY (product_code) REFERENCES products_t10(product_code),
+  CONSTRAINT ps_t10_supp_fk FOREIGN KEY (supplier_id) REFERENCES suppliers_t10(supplier_id)
+);
+
+-- მონაცემების ჩატვირთვა (ETL raw-დან):
+INSERT INTO customers_t10 (customer_id, customer_name)
+SELECT DISTINCT customer_id, customer_name
+FROM sales_raw_t10;
+
+INSERT INTO products_t10 (product_code, product_name)
+SELECT DISTINCT product_code, product_name
+FROM sales_raw_t10;
+
+-- suppliers: ვქმნით surrogate supplier_id-ს
+INSERT INTO suppliers_t10 (supplier_id, supplier_name, supplier_phone)
+SELECT seq_supplier_t10.NEXTVAL, s.supplier_name, s.supplier_phone
+FROM (
+  SELECT DISTINCT supplier_name, supplier_phone
+  FROM sales_raw_t10
+) s;
+
+-- product_suppliers mapping
+INSERT INTO product_suppliers_t10 (product_code, supplier_id)
+SELECT DISTINCT r.product_code, sup.supplier_id
+FROM sales_raw_t10 r
+JOIN suppliers_t10 sup
+  ON sup.supplier_name = r.supplier_name
+ AND sup.supplier_phone = r.supplier_phone;
+
+-- sales: თითო გაყიდვა/ჩანაწერი (customer, product, supplier, month)
+INSERT INTO sales_t10 (customer_id, product_code, supplier_id, sale_month)
+SELECT DISTINCT r.customer_id, r.product_code, sup.supplier_id, r.sale_month
+FROM sales_raw_t10 r
+JOIN suppliers_t10 sup
+  ON sup.supplier_name = r.supplier_name
+ AND sup.supplier_phone = r.supplier_phone;
+
+COMMIT;
+
+-- შემოწმება:
+SELECT * FROM customers_t10 ORDER BY customer_id;
+SELECT * FROM products_t10 ORDER BY product_code;
+SELECT * FROM suppliers_t10 ORDER BY supplier_id;
+SELECT * FROM product_suppliers_t10 ORDER BY product_code, supplier_id;
+SELECT * FROM sales_t10 ORDER BY customer_id, product_code, supplier_id, sale_month;
