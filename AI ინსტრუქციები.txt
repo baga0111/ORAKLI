@@ -1,0 +1,185 @@
+1) ვიწერთ ollama ს ბრაუზერიდან და ვაინსტალირებთ,
+
+2) გახსენი cmd და გაუშვი ეს კომანდები :
+ollama --version
+
+
+ollama pull llama3
+ollama pull nomic-embed-text
+
+როცა ჩაიწერს, 5 გეგაბაიტიან ფაილს შემდეგ გატესტე , ამ კომანდით 
+ollama run llama3
+
+
+3) შექმენი PyCharm ში ახალი პროექტი და დაარქვი ollama
+
+4) თვითონ ამ ollama პროექტში უნდა შექმნა შემდეგი ფაილები , app.py , ingest.py , rag_chain.py და requirements.txt
+
+5) ხოლო შიგნით ამ ollama ს ფაილში , data ში უნდა შექმნა document.txt
+
+6) requirements.txt ში ჩააგდე შემდეგი ტექსტი : 
+
+streamlit
+langchain
+langchain-community
+langchain-core
+langchain-ollama
+chromadb
+tiktoken
+
+
+7) app.py ში ჩაწერე შემდეგი კოდი : 
+import streamlit as st
+from rag_chain import answer_question
+
+st.set_page_config(page_title="RAG Assistant", layout="centered")
+st.title("RAG Assistant")
+
+question = st.text_input("Ask a question:")
+
+if st.button("Ask"):
+    if question.strip():
+        with st.spinner("Thinking..."):
+            answer = answer_question(question)
+        st.subheader("Answer")
+        st.write(answer)
+    else:
+        st.warning("Please enter a question")
+
+
+8) ingest.py ში ჩაწერე შემდეგი კოდი : 
+import os
+from langchain_community.document_loaders import TextLoader
+from langchain_community.vectorstores import Chroma
+from langchain_ollama import OllamaEmbeddings
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+DATA_DIR = ".venv/data"
+DB_DIR = "vectorstore"
+
+def load_doc():
+    docs = []
+    for f in os.listdir(DATA_DIR):
+        if f.endswith(".txt"):
+            path = os.path.join(DATA_DIR, f)
+            loader = TextLoader(path, autodetect_encoding=True)
+            docs.extend(loader.load())
+    return docs
+
+def split_docs(docs):
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=2000,
+        chunk_overlap=50
+    )
+    return splitter.split_documents(docs)
+
+def create_vectorstore(chunks):
+    embeddings = OllamaEmbeddings(model="nomic-embed-text")
+
+    db = Chroma.from_documents(
+        documents=chunks,
+        embedding=embeddings,
+        persist_directory=DB_DIR
+    )
+    db.persist()
+
+if __name__ == "__main__":
+    docs = load_doc()
+    chunks = split_docs(docs)
+    create_vectorstore(chunks)
+    print("Vectorstore created successfully")
+
+9) rag_chain.py ში ჩაწერე შემდეგი კოდი :
+
+from langchain_community.vectorstores import Chroma
+from langchain_ollama import OllamaEmbeddings
+from langchain_community.llms import Ollama
+from langchain_core.prompts import PromptTemplate
+
+DB_DIR = "vectorstore"
+
+embeddings = OllamaEmbeddings(model="nomic-embed-text")
+db = Chroma(
+    persist_directory=DB_DIR,
+    embedding_function=embeddings
+)
+
+retriever = db.as_retriever(search_kwargs={"k": 3})
+
+llm = Ollama(model="llama3")
+
+prompt = PromptTemplate(
+    template="""
+You are a helpful assistant.
+Answer the question using ONLY the context below.
+If the answer is not in the context, say "I don't know based on the document."
+
+Context:
+{context}
+
+Question:
+{question}
+
+Answer:
+""",
+    input_variables=["context", "question"]
+)
+
+def answer_question(question: str) -> str:
+    docs = retriever.invoke(question)
+    context = "\n\n".join(d.page_content for d in docs)
+    return llm.invoke(
+        prompt.format(context=context, question=question)
+    )
+
+
+10) შემდეგ გახსენი ტერმინალი და გაუშვი ეს ბრძანება :
+
+pip install -r requirements.txt
+
+
+11)შემდეგ გაუშვი ეს ბრძანება  : 
+
+python ingest.py
+
+თუ დაგიწერა ეს Vectorstore created successfully , მაშინ ყველაფერი სწორედაა
+
+
+12) საბოლოოდ  გაუშვი streamlit run app.py
+ და უნდა ამოგიგდოს Local URL: http://localhost:8501
+ბრაუზერში გახსენი და მზად არის rag ი, შეგიძლია დაუსვა კითხვა და პასუხს გაგცემს
+
+
+📂 3️⃣ რაც შეეხება გამოცდას — ახალი data ატვირთვას
+
+ეს ძალიან მნიშვნელოვანი ნაწილია და შენს კოდს ეს უკვე სრულად შეუძლია ✅
+
+💡 როგორ იმუშავებს გამოცდაზე
+
+ვთქვათ, ლექტორი მოგცემს ახალ ფაილს:
+
+exam_data.txt
+
+🔁 შენ აკეთებ მხოლოდ ამას:
+1️⃣ ჩააგდებ ფაილს data/ ფოლდერში
+data/
+ ├── document.txt
+ └── exam_data.txt   ← ახალი ფაილი
+
+2️⃣ გაუშვებ ისევ:
+python ingest.py
+
+
+👉 ეს:
+
+წაშლის ძველ embeddings-ს
+
+გაავექტორებს ახალ data-ს
+
+შეინახავს ChromaDB-ში
+
+3️⃣ გაუშვებ app-ს:
+streamlit run app.py
+
+
+🎯 და ყველაფერი ავტომატურად იმუშავებს ახალ ტექსტზე.
