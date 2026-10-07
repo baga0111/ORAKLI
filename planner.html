@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Task Planner</title>
+    <link rel="stylesheet" href="planner.css">
+</head>
+<body>
+
+    <header>
+        <h1>📝 Daily Task Planner</h1>
+        <p>Write a task, choose its priority and add it to your list!</p>
+    </header>
+
+    <main>
+        <section class="controls">
+            <div class="input-group">
+                <label for="taskInput">Your task</label>
+                <input type="text" id="taskInput" maxlength="50" placeholder="Type your task here...">
+                <span id="charCounter">0 / 50</span>
+            </div>
+
+            <div class="input-group">
+                <label for="prioritySelect">Priority</label>
+                <select id="prioritySelect">
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                </select>
+            </div>
+
+            <button id="addBtn">Add Task</button>
+        </section>
+
+        <p id="taskCount">Tasks: 0</p>
+
+        <div id="taskList"></div>
+    </main>
+
+    <script src="planner.js"></script>
+</body>
+</html>

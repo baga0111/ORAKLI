@@ -1,0 +1,196 @@
+/* ===== 1. Basic reset ===== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* ===== 2. Page background and font ===== */
+body {
+    font-family: "Segoe UI", Arial, sans-serif;
+    background-color: #f4f1ea;
+    color: #2d3436;
+    min-height: 100vh;
+    padding: 30px 20px;
+}
+
+/* ===== 3. Header ===== */
+header {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+header h1 {
+    font-size: 2.2rem;
+    margin-bottom: 8px;
+}
+
+header p {
+    color: #636e72;
+}
+
+/* ===== 4. The input area ===== */
+.controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: center;
+    gap: 20px;
+    background-color: white;
+    max-width: 700px;
+    margin: 0 auto 20px auto;
+    padding: 20px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+
+.input-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.input-group label {
+    font-weight: 600;
+    font-size: 0.9rem;
+}
+
+#taskInput {
+    width: 280px;
+    padding: 10px;
+    font-size: 1rem;
+    border: 2px solid #dfe6e9;
+    border-radius: 8px;
+}
+
+#taskInput:focus {
+    outline: none;
+    border-color: #00b894;
+}
+
+#prioritySelect {
+    padding: 10px;
+    font-size: 1rem;
+    border: 2px solid #dfe6e9;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+#charCounter {
+    font-size: 0.8rem;
+    color: #636e72;
+}
+
+/* ===== 5. The button ===== */
+#addBtn {
+    padding: 11px 24px;
+    font-size: 1rem;
+    font-weight: 600;
+    color: white;
+    background-color: #00b894;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+#addBtn:hover {
+    background-color: #00866b;
+}
+
+/* ===== 6. Task count ===== */
+#taskCount {
+    text-align: center;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+/* ===== 7. The task list (responsive layout with Flexbox) ===== */
+#taskList {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 25px;
+    min-height: 250px;
+    background-color: white;
+    border-radius: 12px;
+}
+
+/* ===== 8. The task card ===== */
+.task-card {
+    width: 220px;
+    min-height: 140px;
+    padding: 16px;
+    background-color: #fdfdfd;
+    border-left: 6px solid #b2bec3;
+    border-radius: 6px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.15);
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 12px;
+    word-wrap: break-word;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.task-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.2);
+}
+
+/* ===== 9. Priority colours ===== */
+.priority-low {
+    border-left-color: #00b894;
+}
+
+.priority-medium {
+    border-left-color: #fdcb6e;
+}
+
+.priority-high {
+    border-left-color: #d63031;
+}
+
+/* ===== 10. Finished task ===== */
+.task-card.done {
+    opacity: 0.5;
+}
+
+.task-card.done .task-text {
+    text-decoration: line-through;
+}
+
+/* ===== 11. Inside the card ===== */
+.task-text {
+    font-size: 1.05rem;
+}
+
+.task-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.task-time {
+    font-size: 0.75rem;
+    color: #636e72;
+}
+
+.delete-btn {
+    background: none;
+    border: none;
+    font-size: 1rem;
+    color: #d63031;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.delete-btn:hover {
+    background-color: #fab1a0;
+}
